@@ -1,5 +1,8 @@
+from agentic_ai_project.gradio_app import launch
+
+
 def main():
-    print("Hello from agentic-ai-project!")
+    launch()
 
 
 if __name__ == "__main__":
