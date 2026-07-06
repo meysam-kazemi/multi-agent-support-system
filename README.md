@@ -15,6 +15,8 @@ A GitHub-ready LangGraph project for a multi-agent customer support workflow. It
 
 ## Architecture
 
+![Agentic support workflow graph](imgs/graph.png)
+
 ```text
 Customer message
   -> triage
