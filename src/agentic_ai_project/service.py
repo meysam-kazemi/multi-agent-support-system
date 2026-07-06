@@ -7,12 +7,9 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from dotenv import load_dotenv
-from langgraph.types import Command
-
-from agentic_ai_project.graph import build_support_graph
+from agentic_ai_project.orchestrator import SupportWorkflowOrchestrator
 from agentic_ai_project.rag import DEFAULT_KB_PATH
-from agentic_ai_project.state import make_initial_state, message_content
+from agentic_ai_project.state import message_content
 
 
 @dataclass
@@ -32,11 +29,10 @@ class SupportWorkflowService:
     model: str = "gpt-4o-mini"
     temperature: float = 0
     kb_path: Path = DEFAULT_KB_PATH
-    graph: Any = field(init=False)
+    orchestrator: SupportWorkflowOrchestrator = field(init=False)
 
     def __post_init__(self) -> None:
-        load_dotenv()
-        self.graph = build_support_graph(
+        self.orchestrator = SupportWorkflowOrchestrator(
             model=self.model,
             temperature=self.temperature,
             kb_path=self.kb_path,
@@ -52,17 +48,8 @@ class SupportWorkflowService:
             raise ValueError("user_query cannot be empty.")
 
         thread_id = thread_id or self.new_thread_id(user_id)
-        config = {"configurable": {"thread_id": thread_id}}
-        final_step = None
-
-        for step in self.graph.stream(
-            make_initial_state(user_query, user_id),
-            config,
-            stream_mode="values",
-        ):
-            final_step = step
-
-        return self._to_result(final_step or {}, thread_id)
+        step = self.orchestrator.run_message(user_query, user_id, thread_id)
+        return self._to_result(step, thread_id)
 
     def resume_human_review(
         self,
@@ -70,14 +57,12 @@ class SupportWorkflowService:
         approved: bool,
         replacement_message: str = "",
     ) -> WorkflowResult:
-        payload = {"approved": approved, "message": replacement_message.strip()}
-        config = {"configurable": {"thread_id": thread_id}}
-        final_step = None
-
-        for step in self.graph.stream(Command(resume=payload), config, stream_mode="values"):
-            final_step = step
-
-        return self._to_result(final_step or {}, thread_id)
+        step = self.orchestrator.resume_human_review(
+            thread_id=thread_id,
+            approved=approved,
+            replacement_message=replacement_message.strip(),
+        )
+        return self._to_result(step, thread_id)
 
     def _to_result(self, step: dict[str, Any], thread_id: str) -> WorkflowResult:
         messages = [
