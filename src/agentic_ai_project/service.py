@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from dotenv import load_dotenv
 from langgraph.types import Command
 
 from agentic_ai_project.graph import build_support_graph
+from agentic_ai_project.rag import DEFAULT_KB_PATH
 from agentic_ai_project.state import make_initial_state, message_content
 
 
@@ -28,16 +30,27 @@ class WorkflowResult:
 @dataclass
 class SupportWorkflowService:
     model: str = "gpt-4o-mini"
+    temperature: float = 0
+    kb_path: Path = DEFAULT_KB_PATH
     graph: Any = field(init=False)
 
     def __post_init__(self) -> None:
         load_dotenv()
-        self.graph = build_support_graph(model=self.model)
+        self.graph = build_support_graph(
+            model=self.model,
+            temperature=self.temperature,
+            kb_path=self.kb_path,
+        )
 
     def new_thread_id(self, user_id: str = "test-user") -> str:
         return f"{user_id}-{uuid4().hex[:8]}"
 
     def run(self, user_query: str, user_id: str, thread_id: str | None = None) -> WorkflowResult:
+        user_query = user_query.strip()
+        user_id = (user_id or "test-user").strip()
+        if not user_query:
+            raise ValueError("user_query cannot be empty.")
+
         thread_id = thread_id or self.new_thread_id(user_id)
         config = {"configurable": {"thread_id": thread_id}}
         final_step = None
@@ -57,7 +70,7 @@ class SupportWorkflowService:
         approved: bool,
         replacement_message: str = "",
     ) -> WorkflowResult:
-        payload = {"approved": approved, "message": replacement_message}
+        payload = {"approved": approved, "message": replacement_message.strip()}
         config = {"configurable": {"thread_id": thread_id}}
         final_step = None
 
