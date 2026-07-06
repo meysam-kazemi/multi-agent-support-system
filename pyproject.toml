@@ -32,3 +32,6 @@ build-backend = "hatchling.build"
 
 [tool.uv]
 package = true
+
+[tool.ruff]
+exclude = ["notebooks"]
